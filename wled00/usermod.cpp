@@ -1,5 +1,11 @@
 #include "wled.h"
 #include "audio_reactive.h"
+#include <ESP32Servo.h>
+#include <AccelStepper.h>
+
+extern byte soundAgc;
+extern float sampleAvg;
+extern float sampleAgc;
 /*
  * This v1 usermod file allows you to add own functionality to WLED more easily
  * See: https://github.com/Aircoookie/WLED/wiki/Add-own-functionality
@@ -21,8 +27,35 @@ static unsigned long sampleMaxTimer = 0;  // last time maxSample5sec was reset
 static int receivedFormat = 0;            // last received UDP sound sync format - 0=none, 1=v1 (0.13.x), 2=v2 (0.14.x)
 #define CYCLE_SAMPLEMAX 2500              // time window for merasuring
 
+#define WHITE_LED_PIN       17
+
+//-----Stepper-----
+#define ENABLE_STEPPER 16
+AccelStepper stepper(1, 2, 4);
+int stepperGoToPosition = 3000;
+
+//-----Servo-----
+#define SERVO_DATA_PIN 21
+Servo servoMotor;
+int servoCurrentPosition = 0;
+int servoGoToPosition = 180;
+bool servoUp = true;
+
+int lastMillis = millis();
+
 // This gets called once at boot. Do all initialization that doesn't depend on network here
 void userSetup() {
+  pinMode(WHITE_LED_PIN, OUTPUT);
+
+  pinMode(ENABLE_STEPPER, OUTPUT);
+  digitalWrite(ENABLE_STEPPER, LOW);
+  servoMotor.attach(SERVO_DATA_PIN);
+
+  stepper.setMaxSpeed(1000);
+  stepper.setAcceleration(500);
+  stepper.setCurrentPosition(0);
+  stepper.moveTo(stepperGoToPosition);
+
   disableSoundProcessing = true; // just to be safe
   // Reset I2S peripheral for good measure
   i2s_driver_uninstall(I2S_NUM_0);
@@ -87,6 +120,28 @@ void userConnected() {
 
 // userLoop. You can use "if (WLED_CONNECTED)" to check for successful connection
 void userLoop() {
+
+  //Motors
+  if (stepper.currentPosition() == stepperGoToPosition) {
+    stepperGoToPosition = rand() % 3000;
+    stepper.moveTo(stepperGoToPosition);
+  }
+  stepper.run();
+
+  if (millis() >= lastMillis + 20) {
+    lastMillis = millis();
+    if (servoCurrentPosition == servoGoToPosition) {
+      servoGoToPosition = rand() % 180;
+    } else if (servoGoToPosition > servoCurrentPosition) {
+      servoCurrentPosition += 1;
+    } else {
+      servoCurrentPosition -= 1;
+    }
+    servoMotor.write(servoCurrentPosition);
+  }
+
+  //SR
+
   static unsigned long lastUMRun = millis();          // time of last filter run
 
   // suspend local sound processing when "real time mode" is active (E131, UDP, ADALIGHT, ARTNET)
