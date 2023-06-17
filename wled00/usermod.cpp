@@ -3,9 +3,6 @@
 #include <ESP32Servo.h>
 #include <AccelStepper.h>
 
-extern byte soundAgc;
-extern float sampleAvg;
-extern float sampleAgc;
 /*
  * This v1 usermod file allows you to add own functionality to WLED more easily
  * See: https://github.com/Aircoookie/WLED/wiki/Add-own-functionality
@@ -138,6 +135,14 @@ void userLoop() {
       servoCurrentPosition -= 1;
     }
     servoMotor.write(servoCurrentPosition);
+  }
+
+  int tmpSound = (int) ((soundAgc) ? sampleAgc : sampleAvg);
+
+  if (tmpSound > 150) {
+    digitalWrite(WHITE_LED_PIN, HIGH);
+  } else {
+    digitalWrite(WHITE_LED_PIN, LOW);
   }
 
   //SR
